@@ -22,13 +22,10 @@ Use Kinect Studio to check that your workspace is optimized :
   - The actor's skeleton must not be too shaky
   - If not, try and modify the lighting or the sensor position and tilt angle.
 
-## Demo and configuration videos
-Presentation : [https://youtu.be/Zt8gJzSNSbw]
+## Demo video 
 
-Short demo clip : [https://youtu.be/cdGMrhrUsIs]
-
-Version 1.4 presentation : [https://youtu.be/sFht6XcLZSo]
-
+Short demo clip : [https://youtu.be/FaTr2-vqte8]
+Demo file : [https://github.com/Kvendy-an/KinectMocap4Blender/blob/master/Demo.blend]
 
 ## Before installing the Add-on
 - Install Kinect for Windows SDK 2.0
