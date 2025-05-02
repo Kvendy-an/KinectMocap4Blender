@@ -24,8 +24,8 @@ Use Kinect Studio to check that your workspace is optimized :
 
 ## Demo video 
 
-Short demo clip : [https://youtu.be/FaTr2-vqte8]
-Demo file : [https://github.com/Kvendy-an/KinectMocap4Blender/blob/master/Demo.blend]
+- Short demo clip : [https://youtu.be/FaTr2-vqte8]
+- Demo file : [https://github.com/Kvendy-an/KinectMocap4Blender/blob/master/Demo.blend]
 
 ## Before installing the Add-on
 - Install Kinect for Windows SDK 2.0
