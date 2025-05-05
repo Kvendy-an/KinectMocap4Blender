@@ -1,5 +1,9 @@
+Version 1.4.2:
+- added auto-start tracking
+- added auto-stop tracking
+
 Version 1.4.1:
-- added support for Blender 4.4.1
+- added support for Blender 4.4
 - upgraded to Boost 1.80
 
 Version 1.4:
