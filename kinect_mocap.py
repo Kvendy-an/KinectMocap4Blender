@@ -22,7 +22,7 @@ SOFTWARE.
 bl_info = {
     "name": "Kinect Motion Capture",
     "author": "Morgane Dufresne (Updated for Blender 4.4 by Kvendy)",
-    "version": (1, 4, 1),
+    "version": (1, 4, 2),
     "blender": (4, 4, 0),
     "location": "View3D > Sidebar > Kinect MoCap",
     "description": "Realtime motion capture using Microsoft Kinect v2 and Kalman filtering",
@@ -112,6 +112,9 @@ class KMC_PG_KmcProperties(bpy.types.PropertyGroup):
     lockDepth : bpy.props.BoolProperty(name="depth", description="ignore depth movement", default=True)
     rootBone : bpy.props.EnumProperty(name="root bone", items=KBonesEnum, default="Spine0", description="Kinect identifier of the bone that is used as root of the skeleton")
     kalmanStrength : bpy.props.EnumProperty(name="Denoising", items=KalmanStrengthEnum, default="Normal")
+    auto_start_seconds: bpy.props.FloatProperty(name="Auto-Start", description="Automatically start tracking after this many seconds (0 = disabled) max 10 seconds", default=0.0, min=0.0, max=10.0)
+    auto_stop_seconds: bpy.props.FloatProperty(name="Auto-Stop", description="Automatically stop tracking after this many seconds (0 = disabled) max 10 minutes", default=0.0, min=0.0, max=600.0)
+    time_left: bpy.props.FloatProperty(name="Time Left", description="Remaining recording time in seconds", default=0.0, options={'HIDDEN'})
 
 jointType = {
     "SpineBase":0,
@@ -235,7 +238,6 @@ def initialize(context):
                 baseDir =  bonesDefinition[target.name][2] @ bone.matrix
                 restDirection[target.name] = baseDir.rotation_difference(Vector((0,1,0)))
 
-
 def updatePose(context, bone):
     sensor = context.scene.k_sensor
     
@@ -347,6 +349,12 @@ class KMC_PT_KinectMocapPanel(bpy.types.Panel):
             # denoising strength
             layout.separator()
             layout.prop(context.scene.kmc_props, "kalmanStrength")
+
+            # auto start
+            layout.prop(context.scene.kmc_props, "auto_start_seconds")
+
+            # auto stop
+            layout.prop(context.scene.kmc_props, "auto_stop_seconds")
             
             # activate
             layout.separator()
@@ -354,10 +362,16 @@ class KMC_PT_KinectMocapPanel(bpy.types.Panel):
 
             box = layout.box()
             box.alignment = 'CENTER'
+
             if context.scene.kmc_props.isTracking:
-                box.label(text="Status : tracking")
+                box.label(text="Status: tracking")
+
+                if context.scene.kmc_props.auto_stop_seconds > 0:
+                    secs = int(context.scene.kmc_props.time_left)
+                    mins, secs = divmod(secs, 60)
+                    box.label(text=f"⏱ Time left: {mins:02}:{secs:02}")
             else:
-                box.label(text="Status : stopped")
+                box.label(text="Status: stopped")
             
     def __del__(self):
         pass
@@ -393,34 +407,82 @@ def captureFrame(context):
     else:
         return framerate
 
+def auto_stop_tracking(context):
+    if context.scene.kmc_props.isTracking:
+        context.scene.kmc_props.stopTracking = True
+        context.scene.kmc_props.isTracking = False
+        context.scene.k_sensor.close()
+        print("Auto-stop tracking.")
+
+        # Update UI
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
+
+    return None
+
+def countdown_timer(context):
+    props = context.scene.kmc_props
+    if not props.isTracking or props.time_left <= 0:
+        return None  # Stop timer
+
+    props.time_left -= 1
+
+    # Update UI
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+    return 1.0  # Call again in 1 second
+
+def start_tracking(context):
+    initialize(context)
+
+    uNoise = {
+        "VeryLow": 50.0,
+        "Low": 20.0,
+        "Normal": 5.0,
+        "Strong": 1.0
+    }.get(context.scene.kmc_props.kalmanStrength, 5.0)
+
+    context.scene.k_sensor.init(1.0 / context.scene.kmc_props.fps, 0.0005, uNoise)
+    context.scene.kmc_props.isTracking = True
+
+    stop_after = context.scene.kmc_props.auto_stop_seconds
+    if stop_after > 0:
+        context.scene.kmc_props.time_left = stop_after
+        bpy.app.timers.register(functools.partial(auto_stop_tracking, context), first_interval=stop_after)
+        bpy.app.timers.register(functools.partial(countdown_timer, context), first_interval=1.0)
+
+    bpy.app.timers.register(functools.partial(captureFrame, context))
+    return None
+
 # start tracking
 class KMC_OT_KmcStartTrackingOperator(bpy.types.Operator):
     bl_idname = "kmc.start"
     bl_label = "Start / Stop"
+
+    from time import sleep
     
     def execute(self, context):
-
         if context.scene.kmc_props.isTracking:
+            # Stop tracking
             context.scene.kmc_props.stopTracking = True
             context.scene.kmc_props.isTracking = False
             context.scene.k_sensor.close()
-
         else:
-            # init system
-            initialize(context)
-        
-            uNoise = 5.0
-            if context.scene.kmc_props.kalmanStrength == "VeryLow" :
-                uNoise=50.0
-            elif context.scene.kmc_props.kalmanStrength == "Low" :
-                uNoise=20.0
-            elif context.scene.kmc_props.kalmanStrength == "Normal" :
-                uNoise=5.0
-            elif context.scene.kmc_props.kalmanStrength == "Strong" :
-                uNoise=1.0
-            context.scene.k_sensor.init(1.0 / context.scene.kmc_props.fps, 0.0005, uNoise)
-            bpy.app.timers.register(functools.partial(captureFrame, context))
-            context.scene.kmc_props.isTracking = True
+            delay = context.scene.kmc_props.auto_start_seconds
+            stop_after = context.scene.kmc_props.auto_stop_seconds
+
+            if delay > 0:
+                self.report({'INFO'}, f"Starting in {delay:.1f} seconds...")
+
+                # Delay tracking start
+                bpy.app.timers.register(functools.partial(start_tracking, context), first_interval=delay)
+            else:
+                start_tracking(context)
 
         return {'FINISHED'}
 
