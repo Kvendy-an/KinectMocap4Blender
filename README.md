@@ -9,7 +9,7 @@ This Blender add-on allows you to capture live movement for a human-like model i
 
 The target model must be in a standing rest pose.
 
-It has been developped for Blender 4.4.1 on Windows 11.
+It has been developped for Blender 4.4 on Windows 11.
 
 ## How to optimize the capture
 It is best to have a large room with a flat floor, and a good lighting but not too bright.
@@ -46,6 +46,3 @@ There are two parts in the project :
   - kinectMocap4Blender.pyd : a C++ library
 
 The library was designed to be built using Visual Studio 2022
-
-## Current progress
-The project is currently in version 1.4.1
